@@ -12,7 +12,7 @@ st.title("Prediksi Produksi Padi di Sumatera Tahun 2021")
 st.markdown("Menggunakan Algoritma **Linear Regression** dan **Random Forest**")
 
 # Membaca data lokal
-df = pd.read_csv("data_padi.csv")
+df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
 
 st.subheader("Data Asli")
 st.dataframe(df)
