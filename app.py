@@ -11,7 +11,7 @@ st.title("Prediksi Produksi Padi di Sumatera Tahun 2021")
 st.markdown("Menggunakan Algoritma **Linear Regression** dan **Random Forest**")
 
 # Membaca data langsung dari file CSV di direktori proyek
-df = pd.read_csv("data_padi.csv")  # Pastikan file ini ada di GitHub-mu
+df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")  # Pastikan file ini ada di GitHub-mu
 
 st.subheader("Data Asli")
 st.dataframe(df)
