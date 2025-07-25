@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 
 # Load data
-df = pd.read_csv("data_padi.csv")
+df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
 
 # Fitur dan target
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
