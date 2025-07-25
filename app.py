@@ -1,120 +1,95 @@
-import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+import streamlit as st
 import seaborn as sns
-
+import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
-# Judul
-st.title("Prediksi Produksi Padi di Pulau Sumatera")
-
 # Load data
 df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
-df.columns = df.columns.str.strip()  # Hilangkan spasi pada nama kolom
+df.columns = df.columns.str.strip()  # hapus spasi ekstra jika ada
 
-# Preprocessing
-df['Tahun'] = df['Tahun'].astype(int)
-df = df.dropna()
+# Definisikan fitur dan target
+fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
+target = 'Produksi'
 
-# Bagi data
+# Split data train (1993–2020) dan test (2021–2025)
 df_train = df[df['Tahun'] <= 2020]
 df_test = df[df['Tahun'] > 2020]
 
-# Fitur dan Target
-fitur = ['Luas Panen (ha)', 'Produktivitas (kw/ha)']
-target = 'Produksi (ton)'
-
-X_train = df_train[fitur]
-y_train = df_train[target]
-X_test = df_test[fitur]
-y_test = df_test[target]
-
-# =====================#
-# ===== MODELING ===== #
-# =====================#
-
-# Linear Regression
+# Model
 lr = LinearRegression()
-lr.fit(X_train, y_train)
-y_pred_lr = lr.predict(X_train)
+rf = RandomForestRegressor(n_estimators=50, max_depth=4, random_state=42)  # atur agar tidak overfit
 
-# Random Forest dengan parameter konservatif (anti-overfit)
-rf = RandomForestRegressor(
-    n_estimators=50,
-    max_depth=5,
-    random_state=42
-)
-rf.fit(X_train, y_train)
-y_pred_rf = rf.predict(X_train)
+# Latih model
+lr.fit(df_train[fitur], df_train[target])
+rf.fit(df_train[fitur], df_train[target])
 
-# ========================#
-# ===== EVALUASI =========#
-# ========================#
-def evaluate_model(name, y_true, y_pred):
+# Prediksi
+df_train['Pred_LR'] = lr.predict(df_train[fitur])
+df_train['Pred_RF'] = rf.predict(df_train[fitur])
+df_test['Pred_LR'] = lr.predict(df_test[fitur])
+df_test['Pred_RF'] = rf.predict(df_test[fitur])
+
+# Evaluasi
+def evaluasi(y_true, y_pred):
     return {
-        "Model": name,
-        "R² Score": round(r2_score(y_true, y_pred), 4),
-        "MAE (ton)": f"{mean_absolute_error(y_true, y_pred):,.2f}",
-        "MSE (ton²)": f"{mean_squared_error(y_true, y_pred):,.2f}",
+        "R² Score": r2_score(y_true, y_pred),
+        "MAE (ton)": mean_absolute_error(y_true, y_pred),
+        "MSE (ton²)": mean_squared_error(y_true, y_pred)
     }
 
-results = [
-    evaluate_model("Linear Regression", y_train, y_pred_lr),
-    evaluate_model("Random Forest", y_train, y_pred_rf),
-]
+eval_lr_train = evaluasi(df_train[target], df_train['Pred_LR'])
+eval_rf_train = evaluasi(df_train[target], df_train['Pred_RF'])
+eval_lr_test = evaluasi(df_test[target], df_test['Pred_LR'])
+eval_rf_test = evaluasi(df_test[target], df_test['Pred_RF'])
 
-eval_df = pd.DataFrame(results)
+# Streamlit UI
+st.title("Prediksi Produksi Padi di Sumatera")
+st.subheader("Evaluasi Model")
 
-st.subheader("Evaluasi Model pada Data Latih")
-st.dataframe(eval_df, use_container_width=True)
+# Tabel evaluasi
+def tampilkan_evaluasi(judul, eval_lr, eval_rf):
+    st.markdown(f"### {judul}")
+    st.dataframe(pd.DataFrame({
+        "Linear Regression": eval_lr,
+        "Random Forest": eval_rf
+    }))
 
-# ============================#
-# ===== VISUALISASI =========#
-# ============================#
+tampilkan_evaluasi("Data Latih (1993–2020)", eval_lr_train, eval_rf_train)
+tampilkan_evaluasi("Data Uji (2021–2025)", eval_lr_test, eval_rf_test)
 
-st.subheader("Visualisasi Fitur")
+# Visualisasi prediksi vs aktual
+st.subheader("Visualisasi Prediksi vs Aktual")
+tahun_range = st.selectbox("Pilih rentang data", ["1993–2020", "2021–2025"])
+df_plot = df_train if tahun_range == "1993–2020" else df_test
 
-fitur_pilihan = st.multiselect("Pilih fitur untuk ditampilkan", df.columns.tolist(), default=["Produksi (ton)"])
-tahun_range = st.slider("Rentang Tahun", int(df['Tahun'].min()), int(df['Tahun'].max()), (1993, 2025))
+plt.figure(figsize=(10, 5))
+plt.plot(df_plot['Tahun'], df_plot[target], label='Aktual', marker='o')
+plt.plot(df_plot['Tahun'], df_plot['Pred_LR'], label='Linear Regression', marker='s')
+plt.plot(df_plot['Tahun'], df_plot['Pred_RF'], label='Random Forest', marker='^')
+plt.xlabel("Tahun")
+plt.ylabel("Produksi (ton)")
+plt.title("Prediksi vs Aktual Produksi Padi")
+plt.legend()
+st.pyplot(plt)
 
-if fitur_pilihan:
-    df_plot = df[(df['Tahun'] >= tahun_range[0]) & (df['Tahun'] <= tahun_range[1])]
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for col in fitur_pilihan:
-        ax.plot(df_plot['Tahun'], df_plot[col], label=col)
-    ax.set_xlabel("Tahun")
-    ax.set_ylabel("Nilai")
-    ax.set_title("Tren Data per Tahun")
-    ax.legend()
-    st.pyplot(fig)
+# Korelasi fitur (opsional)
+st.subheader("Korelasi dan Distribusi Fitur")
+fitur_dipilih = st.multiselect("Pilih fitur yang ingin dianalisis", fitur, default=fitur[:2])
 
-# =============================#
-# ===== PREDIKSI MASA DEPAN ==#
-# =============================#
+if fitur_dipilih:
+    st.write("📌 Korelasi antar fitur:")
+    corr = df[fitur_dipilih + [target]].corr()
+    fig_corr, ax = plt.subplots()
+    sns.heatmap(corr, annot=True, cmap='YlGnBu', ax=ax)
+    st.pyplot(fig_corr)
 
-st.subheader("Prediksi Produksi Padi (2021–2025)")
+    for f in fitur_dipilih:
+        fig_feat, ax_feat = plt.subplots()
+        sns.scatterplot(data=df, x=f, y=target, ax=ax_feat)
+        ax_feat.set_title(f'Hasil Produksi terhadap {f}')
+        st.pyplot(fig_feat)
 
-df_pred = df_test.copy()
-df_pred['Pred_LR'] = lr.predict(X_test)
-df_pred['Pred_RF'] = rf.predict(X_test)
-
-st.dataframe(df_pred[['Provinsi', 'Tahun', 'Produksi (ton)', 'Pred_LR', 'Pred_RF']], use_container_width=True)
-
-# Visualisasi hasil prediksi
-st.subheader("Perbandingan Aktual vs Prediksi")
-
-provinsi_pilih = st.selectbox("Pilih Provinsi", df_pred['Provinsi'].unique())
-
-df_prov = df_pred[df_pred['Provinsi'] == provinsi_pilih]
-fig2, ax2 = plt.subplots(figsize=(10, 5))
-ax2.plot(df_prov['Tahun'], df_prov['Produksi (ton)'], label='Aktual', marker='o')
-ax2.plot(df_prov['Tahun'], df_prov['Pred_LR'], label='Linear Regression', marker='s')
-ax2.plot(df_prov['Tahun'], df_prov['Pred_RF'], label='Random Forest', marker='^')
-ax2.set_title(f"Prediksi Produksi Padi di {provinsi_pilih}")
-ax2.set_xlabel("Tahun")
-ax2.set_ylabel("Produksi (ton)")
-ax2.legend()
-st.pyplot(fig2)
+st.caption("© 2025 Prediksi Produksi Padi - Streamlit App")
