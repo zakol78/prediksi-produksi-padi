@@ -6,6 +6,7 @@ import seaborn as sns
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.model_selection import train_test_split
 
 # Judul
 st.title("Prediksi Produksi Padi di Sumatera (1993–2025)")
@@ -18,14 +19,19 @@ df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
 target = 'Produksi'
 
-# Bagi data latih
+# Bagi data latih (1993–2020)
 df_train = df[df['Tahun'] <= 2020]
+
+# Split train-validation
+X_train, X_val, y_train, y_val = train_test_split(
+    df_train[fitur], df_train[target], test_size=0.2, random_state=42
+)
 
 # Latih model
 lr = LinearRegression()
 rf = RandomForestRegressor(random_state=42)
-lr.fit(df_train[fitur], df_train[target])
-rf.fit(df_train[fitur], df_train[target])
+lr.fit(X_train, y_train)
+rf.fit(X_train, y_train)
 
 # Prediksi data aktual (1993–2020)
 df_actual = df.copy()
@@ -83,18 +89,17 @@ ax.legend()
 st.pyplot(fig)
 
 # Evaluasi model
-st.subheader("Evaluasi Model pada Data Latih")
-st.caption("Evaluasi dilakukan hanya pada data tahun 1993–2020. Data tahun 2021–2025 hanya digunakan untuk prediksi dan tidak termasuk evaluasi.")
+st.subheader("Evaluasi Model pada Data Validasi")
+st.caption("Evaluasi dilakukan pada 20% data validasi dari tahun 1993–2020. Data tahun 2021–2025 hanya digunakan untuk prediksi.")
 
-y_true = df_train[target]
-y_pred_lr = lr.predict(df_train[fitur])
-y_pred_rf = rf.predict(df_train[fitur])
+y_pred_lr = lr.predict(X_val)
+y_pred_rf = rf.predict(X_val)
 
 eval_df = pd.DataFrame({
     'Model': ['Linear Regression', 'Random Forest'],
-    'R² Score': [r2_score(y_true, y_pred_lr), r2_score(y_true, y_pred_rf)],
-    'MAE (ton)': [mean_absolute_error(y_true, y_pred_lr), mean_absolute_error(y_true, y_pred_rf)],
-    'MSE (ton²)': [mean_squared_error(y_true, y_pred_lr), mean_squared_error(y_true, y_pred_rf)]
+    'R² Score': [r2_score(y_val, y_pred_lr), r2_score(y_val, y_pred_rf)],
+    'MAE (ton)': [mean_absolute_error(y_val, y_pred_lr), mean_absolute_error(y_val, y_pred_rf)],
+    'MSE (ton²)': [mean_squared_error(y_val, y_pred_lr), mean_squared_error(y_val, y_pred_rf)]
 })
 
 st.dataframe(eval_df.style.format({
