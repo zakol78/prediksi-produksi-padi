@@ -84,6 +84,7 @@ st.pyplot(fig)
 
 # Evaluasi model
 st.subheader("Evaluasi Model pada Data Latih")
+st.caption("Evaluasi dilakukan hanya pada data tahun 1993–2020. Data tahun 2021–2025 hanya digunakan untuk prediksi dan tidak termasuk evaluasi.")
 
 y_true = df_train[target]
 y_pred_lr = lr.predict(df_train[fitur])
