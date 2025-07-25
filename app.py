@@ -1,106 +1,98 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Prediksi Produksi Padi", layout="wide")
-st.title("📈 Prediksi Produksi Padi di Pulau Sumatera")
+# Judul Aplikasi
+st.title("Prediksi Produksi Padi di Pulau Sumatera")
+st.write("Menggunakan Algoritma Random Forest dan Linear Regression")
 
-# --------------------------------------------
-# 1. Load Data
-# --------------------------------------------
+# Load dataset
 try:
     df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
-    df.columns = df.columns.str.strip()  # hilangkan spasi ekstra
-    st.success("✅ Data berhasil dimuat.")
+    df.columns = df.columns.str.strip().str.replace('\u200b', '')  # bersihkan kolom
 except Exception as e:
-    st.error(f"❌ Gagal memuat data: {e}")
+    st.error(f"Gagal memuat data: {e}")
     st.stop()
 
-# --------------------------------------------
-# 2. Cek Kolom yang Terdeteksi
-# --------------------------------------------
-st.sidebar.header("📋 Fitur yang Digunakan")
+# Cek nama kolom
+expected_columns = ['Provinsi', 'Tahun', 'Produksi', 'Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
+if not all(col in df.columns for col in expected_columns):
+    st.error(f"Kolom tidak lengkap! Kolom tersedia: {df.columns.tolist()}")
+    st.stop()
+
+# Pisahkan fitur dan target
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
 target = 'Produksi'
 
-missing = [col for col in fitur + [target, 'Tahun', 'Provinsi'] if col not in df.columns]
-if missing:
-    st.error(f"❌ Kolom hilang di dataset: {missing}")
-    st.stop()
+# Bagi data latih dan uji
+X = df[fitur]
+y = df[target]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# --------------------------------------------
-# 3. Filter Tahun
-# --------------------------------------------
-df_train = df[df['Tahun'] <= 2020]
-df_test = df[df['Tahun'] > 2020]
+# Inisialisasi model
+rf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42)
+lr = LinearRegression()
 
-X_train = df_train[fitur]
-y_train = df_train[target]
-X_test = df_test[fitur]
-y_test = df_test[target]
+# Latih model
+rf.fit(X_train, y_train)
+lr.fit(X_train, y_train)
 
-# --------------------------------------------
-# 4. Model Training
-# --------------------------------------------
-st.subheader("🔧 Konfigurasi Model Random Forest")
-n_estimators = st.slider("Jumlah Pohon (n_estimators)", 10, 300, 100, 10)
-max_depth = st.slider("Kedalaman Maksimal (max_depth)", 1, 30, 10)
+# Prediksi
+rf_pred_train = rf.predict(X_train)
+rf_pred_test = rf.predict(X_test)
+lr_pred_train = lr.predict(X_train)
+lr_pred_test = lr.predict(X_test)
 
-rf_model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
-rf_model.fit(X_train, y_train)
-y_pred_rf = rf_model.predict(X_test)
-
-# Linear Regression (untuk perbandingan)
-lr_model = LinearRegression()
-lr_model.fit(X_train, y_train)
-y_pred_lr = lr_model.predict(X_test)
-
-# --------------------------------------------
-# 5. Evaluasi Model
-# --------------------------------------------
-def evaluasi_model(y_true, y_pred, model_name):
-    mse = mean_squared_error(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
+# Evaluasi Model
+def evaluate(model_name, y_true, y_pred):
+    rmse = mean_squared_error(y_true, y_pred, squared=False)
     r2 = r2_score(y_true, y_pred)
-    st.markdown(f"#### {model_name}")
-    st.write(f"- R2 Score: `{r2:.4f}`")
-    st.write(f"- MAE: `{mae:.2f}`")
-    st.write(f"- MSE: `{mse:.2f}`")
+    return f"**{model_name}** | RMSE: {rmse:.2f} | R²: {r2:.2f}"
 
-st.subheader("📊 Evaluasi Model (Data Uji 2021–2025)")
-evaluasi_model(y_test, y_pred_rf, "🌲 Random Forest")
-evaluasi_model(y_test, y_pred_lr, "📉 Linear Regression")
+st.subheader("Evaluasi Model")
+st.markdown(evaluate("Random Forest (Train)", y_train, rf_pred_train))
+st.markdown(evaluate("Random Forest (Test)", y_test, rf_pred_test))
+st.markdown(evaluate("Linear Regression (Train)", y_train, lr_pred_train))
+st.markdown(evaluate("Linear Regression (Test)", y_test, lr_pred_test))
 
-# --------------------------------------------
-# 6. Visualisasi Prediksi
-# --------------------------------------------
-st.subheader("📈 Visualisasi Hasil Prediksi")
+# Visualisasi hasil prediksi
+st.subheader("Perbandingan Hasil Prediksi vs Aktual")
+fig, ax = plt.subplots()
+ax.scatter(y_test, rf_pred_test, label='Random Forest', alpha=0.7)
+ax.scatter(y_test, lr_pred_test, label='Linear Regression', alpha=0.7)
+ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--')
+ax.set_xlabel("Produksi Aktual")
+ax.set_ylabel("Prediksi")
+ax.legend()
+st.pyplot(fig)
 
-fitur_grafik = st.selectbox("Pilih Provinsi", sorted(df_test['Provinsi'].unique()))
+# Form Prediksi Manual
+st.subheader("Prediksi Produksi Padi (Input Manual)")
+luas = st.number_input("Luas Panen (ha)", min_value=0.0, step=1.0)
+hujan = st.number_input("Curah Hujan (mm)", min_value=0.0, step=1.0)
+lembap = st.number_input("Kelembapan (%)", min_value=0.0, max_value=100.0, step=1.0)
+suhu = st.number_input("Suhu Rata-rata (°C)", min_value=0.0, step=0.1)
 
-df_plot = df_test[df_test['Provinsi'] == fitur_grafik].copy()
-df_plot['Prediksi_RF'] = rf_model.predict(df_plot[fitur])
-df_plot['Prediksi_LR'] = lr_model.predict(df_plot[fitur])
+if st.button("Prediksi Sekarang"):
+    data_input = np.array([[luas, hujan, lembap, suhu]])
+    rf_pred = rf.predict(data_input)[0]
+    lr_pred = lr.predict(data_input)[0]
+    st.success(f"Hasil Prediksi Produksi (ton):")
+    st.markdown(f"- **Random Forest**: {rf_pred:.2f} ton")
+    st.markdown(f"- **Linear Regression**: {lr_pred:.2f} ton")
 
-plt.figure(figsize=(10, 5))
-plt.plot(df_plot['Tahun'], df_plot[target], marker='o', label='Data Aktual', linewidth=2)
-plt.plot(df_plot['Tahun'], df_plot['Prediksi_RF'], marker='s', label='Random Forest', linestyle='--')
-plt.plot(df_plot['Tahun'], df_plot['Prediksi_LR'], marker='^', label='Linear Regression', linestyle='--')
-plt.title(f"Prediksi Produksi Padi Provinsi {fitur_grafik}")
-plt.xlabel("Tahun")
-plt.ylabel("Produksi (ton)")
-plt.legend()
-plt.grid(True)
-st.pyplot(plt)
+# Prediksi Otomatis Tahun Depan
+st.subheader("Prediksi Tahun Berikutnya Otomatis")
+tahun_terakhir = df['Tahun'].max()
+rata_input = df[fitur].mean().values.reshape(1, -1)
+rf_pred_next = rf.predict(rata_input)[0]
+lr_pred_next = lr.predict(rata_input)[0]
 
-# --------------------------------------------
-# 7. Tampilkan Data
-# --------------------------------------------
-st.subheader("📄 Dataset yang Digunakan")
-with st.expander("Klik untuk melihat data"):
-    st.dataframe(df)
-
+st.markdown(f"📅 Prediksi produksi untuk tahun {tahun_terakhir + 1}:")
+st.markdown(f"- Random Forest: **{rf_pred_next:.2f} ton**")
+st.markdown(f"- Linear Regression: **{lr_pred_next:.2f} ton**")
