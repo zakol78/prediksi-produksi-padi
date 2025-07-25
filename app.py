@@ -8,7 +8,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
 st.set_page_config(page_title="Prediksi Produksi Padi", layout="wide")
-st.title("Prediksi Produksi Padi di Sumatera Tahun 2021")
+st.title("Prediksi Produksi Padi di Sumatera 2021–2025")
 st.markdown("Menggunakan Algoritma **Linear Regression** dan **Random Forest**")
 
 # Membaca data lokal
@@ -17,17 +17,14 @@ df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
 st.subheader("Data Asli")
 st.dataframe(df)
 
-# Split data
+# Split data training
 df_train = df[df['Tahun'] < 2021]
-df_2021 = df[df['Tahun'] == 2020].copy()
-df_2021['Tahun'] = 2021
 
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
 target = 'Produksi'
 
 X = df_train[fitur]
 y = df_train[target]
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Model Linear Regression
@@ -48,35 +45,48 @@ mae_rf = mean_absolute_error(y_test, y_pred_rf)
 rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
 r2_rf = r2_score(y_test, y_pred_rf)
 
-# Prediksi untuk tahun 2021
-pred_lr_2021 = lr.predict(df_2021[fitur])
-pred_rf_2021 = rf.predict(df_2021[fitur])
+# Prediksi tahun 2021–2025 berdasarkan data 2020
+df_base = df[df['Tahun'] == 2020].copy()
+hasil_prediksi = []
 
-hasil = df_2021[['Provinsi']].copy()
-hasil['Tahun'] = 2021
-hasil['Prediksi (Linear Regression)'] = pred_lr_2021
-hasil['Prediksi (Random Forest)'] = pred_rf_2021
+for tahun in range(2021, 2026):
+    df_temp = df_base.copy()
+    df_temp['Tahun'] = tahun
+    pred_lr = lr.predict(df_temp[fitur])
+    pred_rf = rf.predict(df_temp[fitur])
+    
+    df_result = df_temp[['Provinsi']].copy()
+    df_result['Tahun'] = tahun
+    df_result['Prediksi (Linear Regression)'] = pred_lr
+    df_result['Prediksi (Random Forest)'] = pred_rf
+    hasil_prediksi.append(df_result)
 
-st.subheader("Hasil Prediksi Produksi Padi Tahun 2021")
-st.dataframe(hasil.style.format({'Prediksi (Linear Regression)': '{:.2f}', 'Prediksi (Random Forest)': '{:.2f}'}))
+# Gabungkan semua prediksi
+df_prediksi = pd.concat(hasil_prediksi, ignore_index=True)
 
-# Grafik Visualisasi
-st.subheader("Grafik Perbandingan Prediksi Produksi Padi")
+# Tampilkan hasil
+st.subheader("Hasil Prediksi Produksi Padi 2021–2025")
+st.dataframe(df_prediksi.style.format({'Prediksi (Linear Regression)': '{:.2f}', 'Prediksi (Random Forest)': '{:.2f}'}))
+
+# Grafik visualisasi per tahun
+st.subheader("Grafik Prediksi Produksi per Tahun dan Provinsi")
+tahun_terpilih = st.selectbox("Pilih Tahun", sorted(df_prediksi['Tahun'].unique()))
+df_tahun = df_prediksi[df_prediksi['Tahun'] == tahun_terpilih]
+
 fig, ax = plt.subplots(figsize=(12, 6))
 bar_width = 0.35
-index = np.arange(len(hasil))
+index = np.arange(len(df_tahun))
 
-ax.bar(index, hasil['Prediksi (Linear Regression)'], bar_width, label='Linear Regression')
-ax.bar(index + bar_width, hasil['Prediksi (Random Forest)'], bar_width, label='Random Forest')
+ax.bar(index, df_tahun['Prediksi (Linear Regression)'], bar_width, label='Linear Regression')
+ax.bar(index + bar_width, df_tahun['Prediksi (Random Forest)'], bar_width, label='Random Forest')
 
 ax.set_xlabel('Provinsi')
 ax.set_ylabel('Prediksi Produksi')
-ax.set_title('Perbandingan Prediksi Produksi Padi Tahun 2021')
+ax.set_title(f'Prediksi Produksi Padi Tahun {tahun_terpilih}')
 ax.set_xticks(index + bar_width / 2)
-ax.set_xticklabels(hasil['Provinsi'], rotation=45, ha='right')
+ax.set_xticklabels(df_tahun['Provinsi'], rotation=45, ha='right')
 ax.legend()
 plt.tight_layout()
-
 st.pyplot(fig)
 
 # Evaluasi model
