@@ -8,17 +8,17 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 # Judul aplikasi
-st.title("Prediksi Produksi Padi di Sumatera (2021–2025)")
+st.title("Prediksi Produksi Padi di Sumatera (1993–2025)")
 st.write("Menggunakan algoritma: **Linear Regression** dan **Random Forest**")
 
-# Load data (sesuai permintaan)
+# Load data
 df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
 
 # Menentukan fitur dan target
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
 target = 'Produksi'
 
-# Membagi data latih (hingga tahun 2020)
+# Data latih (1993–2020)
 df_train = df[df['Tahun'] <= 2020]
 
 # Melatih model
@@ -28,11 +28,15 @@ rf = RandomForestRegressor(random_state=42)
 lr.fit(df_train[fitur], df_train[target])
 rf.fit(df_train[fitur], df_train[target])
 
-# Prediksi tahun 2021 (duplikasi dari 2020)
-df_2021 = df[df['Tahun'] == 2020].copy()
-df_2021['Tahun'] = 2021
+# === Prediksi Historis (1993–2020) ===
+df_hist = df.copy()
+df_hist['Prediksi (Linear Regression)'] = lr.predict(df_hist[fitur])
+df_hist['Prediksi (Random Forest)'] = rf.predict(df_hist[fitur])
 
-# Fungsi membuat data masa depan
+# === Prediksi Masa Depan (2021–2025) ===
+df_2020 = df[df['Tahun'] == 2020].copy()
+df_2020['Tahun'] = 2021
+
 def generate_future_data(df_base, start_year, end_year):
     future_data = []
     for year in range(start_year, end_year + 1):
@@ -45,31 +49,28 @@ def generate_future_data(df_base, start_year, end_year):
         future_data.append(temp)
     return pd.concat(future_data, ignore_index=True)
 
-# Simulasi tahun 2022–2025
-df_2022_2025 = generate_future_data(df_2021, 2022, 2025)
+df_future = generate_future_data(df_2020, 2022, 2025)
+df_future = pd.concat([df_2020, df_future], ignore_index=True)
 
-# Gabungkan untuk prediksi
-df_prediksi = pd.concat([df_2021, df_2022_2025], ignore_index=True)
+df_future['Prediksi (Linear Regression)'] = lr.predict(df_future[fitur])
+df_future['Prediksi (Random Forest)'] = rf.predict(df_future[fitur])
 
-# Prediksi
-pred_lr = lr.predict(df_prediksi[fitur])
-pred_rf = rf.predict(df_prediksi[fitur])
+# Gabungkan data historis dan prediksi masa depan
+df_all_pred = pd.concat([
+    df_hist[['Provinsi', 'Tahun', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']],
+    df_future[['Provinsi', 'Tahun', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']]
+], ignore_index=True)
 
-# Data hasil prediksi
-hasil = df_prediksi[['Provinsi', 'Tahun']].copy()
-hasil['Prediksi (Linear Regression)'] = pred_lr
-hasil['Prediksi (Random Forest)'] = pred_rf
+# === Tabel Prediksi Lengkap ===
+st.subheader("Hasil Prediksi Produksi Padi (1993–2025)")
+st.dataframe(df_all_pred)
 
-# Tampilkan tabel prediksi
-st.subheader("Hasil Prediksi Produksi Padi")
-st.dataframe(hasil)
-
-# Visualisasi per tahun
+# === Visualisasi Tahunan ===
 st.subheader("Grafik Perbandingan Prediksi per Tahun")
 
-for tahun in sorted(hasil['Tahun'].unique()):
+for tahun in sorted(df_all_pred['Tahun'].unique()):
     st.markdown(f"### Tahun {tahun}")
-    df_tahun = hasil[hasil['Tahun'] == tahun]
+    df_tahun = df_all_pred[df_all_pred['Tahun'] == tahun]
 
     fig, ax = plt.subplots(figsize=(10, 5))
     x = np.arange(len(df_tahun))
@@ -86,28 +87,18 @@ for tahun in sorted(hasil['Tahun'].unique()):
 
     st.pyplot(fig)
 
-# Evaluasi model
+# === Evaluasi Model pada Data Latih ===
 st.subheader("Evaluasi Model pada Data Latih")
 
-# Linear Regression
 y_true = df_train[target]
 y_pred_lr = lr.predict(df_train[fitur])
-r2_lr = r2_score(y_true, y_pred_lr)
-mae_lr = mean_absolute_error(y_true, y_pred_lr)
-mse_lr = mean_squared_error(y_true, y_pred_lr)
-
-# Random Forest
 y_pred_rf = rf.predict(df_train[fitur])
-r2_rf = r2_score(y_true, y_pred_rf)
-mae_rf = mean_absolute_error(y_true, y_pred_rf)
-mse_rf = mean_squared_error(y_true, y_pred_rf)
 
-# Tabel evaluasi model
 eval_df = pd.DataFrame({
     'Model': ['Linear Regression', 'Random Forest'],
-    'R² Score': [r2_lr, r2_rf],
-    'MAE (ton)': [mae_lr, mae_rf],
-    'MSE (ton²)': [mse_lr, mse_rf]
+    'R² Score': [r2_score(y_true, y_pred_lr), r2_score(y_true, y_pred_rf)],
+    'MAE (ton)': [mean_absolute_error(y_true, y_pred_lr), mean_absolute_error(y_true, y_pred_rf)],
+    'MSE (ton²)': [mean_squared_error(y_true, y_pred_lr), mean_squared_error(y_true, y_pred_rf)],
 })
 
 st.dataframe(eval_df.style.format({
