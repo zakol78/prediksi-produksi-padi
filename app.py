@@ -14,6 +14,9 @@ st.markdown("Menggunakan algoritma: **Linear Regression** dan **Random Forest**"
 # Load Data
 df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
 
+# Bersihkan nama kolom dari spasi
+df.columns = df.columns.str.strip()
+
 # Fitur & Target
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
 target = 'Produksi'
@@ -23,12 +26,7 @@ df_train = df[df['Tahun'] <= 2020]
 
 # Latih model
 lr = LinearRegression()
-rf = RandomForestRegressor(
-    n_estimators=100,          # dikurangi dari default 100 ke 100 (masih cukup stabil)
-    max_depth=10,              # batasi kedalaman pohon
-    min_samples_leaf=5,        # mencegah overfitting
-    random_state=42
-)
+rf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42)  # dibatasi agar tidak overfit
 lr.fit(df_train[fitur], df_train[target])
 rf.fit(df_train[fitur], df_train[target])
 
@@ -37,11 +35,10 @@ df_actual = df.copy()
 df_actual['Prediksi (Linear Regression)'] = lr.predict(df[fitur])
 df_actual['Prediksi (Random Forest)'] = rf.predict(df[fitur])
 
-# Tampilkan data 1993–2020
 st.subheader("Prediksi pada Data Tahun 1993–2020")
 st.dataframe(df_actual[df_actual['Tahun'] <= 2020][['Provinsi', 'Tahun', 'Produksi', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']])
 
-# Prediksi masa depan 2021–2025
+# Prediksi masa depan
 df_2021 = df[df['Tahun'] == 2020].copy()
 df_2021['Tahun'] = 2021
 
@@ -63,11 +60,10 @@ df_future = pd.concat([df_2021, df_2022_2025], ignore_index=True)
 df_future['Prediksi (Linear Regression)'] = lr.predict(df_future[fitur])
 df_future['Prediksi (Random Forest)'] = rf.predict(df_future[fitur])
 
-# Tampilkan data 2021–2025
 st.subheader("Prediksi Produksi Padi Tahun 2021–2025")
 st.dataframe(df_future[['Provinsi', 'Tahun', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']])
 
-# Dropdown visualisasi per tahun
+# Visualisasi per tahun
 st.subheader("Visualisasi Perbandingan Prediksi")
 tahun_terpilih = st.selectbox("Pilih Tahun untuk Ditampilkan", sorted(df_future['Tahun'].unique()))
 df_tampil = df_future[df_future['Tahun'] == tahun_terpilih]
@@ -78,18 +74,15 @@ width = 0.35
 
 ax.bar(x - width/2, df_tampil['Prediksi (Linear Regression)'], width, label='Linear Regression')
 ax.bar(x + width/2, df_tampil['Prediksi (Random Forest)'], width, label='Random Forest')
-
 ax.set_xticks(x)
 ax.set_xticklabels(df_tampil['Provinsi'], rotation=45, ha='right')
 ax.set_ylabel("Produksi (Ton)")
 ax.set_title(f"Prediksi Produksi Padi Tahun {tahun_terpilih}")
 ax.legend()
-
 st.pyplot(fig)
 
 # Evaluasi model
 st.subheader("Evaluasi Model pada Data Latih")
-
 y_true = df_train[target]
 y_pred_lr = lr.predict(df_train[fitur])
 y_pred_rf = rf.predict(df_train[fitur])
