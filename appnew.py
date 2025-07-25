@@ -9,7 +9,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 
 # Judul
-st.title("Prediksi Produksi Padi di Sumatera (1993–2025)")
+st.title("Prediksi Produksi Padi di Sumatera (1993–2030)")
 st.markdown("Menggunakan algoritma: **Linear Regression** dan **Random Forest**")
 
 # Load Data
@@ -42,9 +42,9 @@ df_actual['Prediksi (Random Forest)'] = rf.predict(df[fitur])
 st.subheader("Prediksi pada Data Tahun 1993–2020")
 st.dataframe(df_actual[df_actual['Tahun'] <= 2020][['Provinsi', 'Tahun', 'Produksi', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']])
 
-# Prediksi masa depan 2021–2025
-df_2021 = df[df['Tahun'] == 2020].copy()
-df_2021['Tahun'] = 2021
+# Prediksi masa depan 2025–2030
+df_2025 = df[df['Tahun'] == 2020].copy()
+df_2025['Tahun'] = 2025
 
 def generate_future_data(df_base, start_year, end_year):
     future_data = []
@@ -58,14 +58,14 @@ def generate_future_data(df_base, start_year, end_year):
         future_data.append(temp)
     return pd.concat(future_data, ignore_index=True)
 
-df_2022_2025 = generate_future_data(df_2021, 2022, 2025)
-df_future = pd.concat([df_2021, df_2022_2025], ignore_index=True)
+df_2026_2030 = generate_future_data(df_2025, 2026, 2030)
+df_future = pd.concat([df_2025, df_2026_2030], ignore_index=True)
 
 df_future['Prediksi (Linear Regression)'] = lr.predict(df_future[fitur])
 df_future['Prediksi (Random Forest)'] = rf.predict(df_future[fitur])
 
-# Tampilkan data 2021–2025
-st.subheader("Prediksi Produksi Padi Tahun 2021–2025")
+# Tampilkan data 2025–2030
+st.subheader("Prediksi Produksi Padi Tahun 2025–2030")
 st.dataframe(df_future[['Provinsi', 'Tahun', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']])
 
 # Dropdown visualisasi per tahun
@@ -90,7 +90,7 @@ st.pyplot(fig)
 
 # Evaluasi model
 st.subheader("Evaluasi Model pada Data Validasi")
-st.caption("Evaluasi dilakukan pada 20% data validasi dari tahun 1993–2020. Data tahun 2021–2025 hanya digunakan untuk prediksi.")
+st.caption("Evaluasi dilakukan pada 20% data validasi dari tahun 1993–2020. Data tahun 2025–2030 hanya digunakan untuk prediksi.")
 
 y_pred_lr = lr.predict(X_val)
 y_pred_rf = rf.predict(X_val)
