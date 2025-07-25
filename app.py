@@ -1,95 +1,95 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-# Load data
-df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
-df.columns = df.columns.str.strip()  # hapus spasi ekstra jika ada
+# ------------------ CONFIG ------------------
+st.set_page_config(page_title="Prediksi Produksi Padi", layout="wide")
+st.title("📊 Prediksi Produksi Padi di Pulau Sumatera")
+st.markdown("Menggunakan **Random Forest** dan **Linear Regression** berdasarkan data historis.")
 
-# Definisikan fitur dan target
+# ------------------ LOAD DATA ------------------
+try:
+    df = pd.read_csv("Data_Tanaman_Padi_Sumatera_version_1.csv")
+except FileNotFoundError:
+    st.error("❌ File 'Data_Tanaman_Padi_Sumatera_version_1.csv' tidak ditemukan. Pastikan file ada di direktori yang sama.")
+    st.stop()
+
+# ------------------ PREPROCESSING ------------------
+df.columns = df.columns.str.strip()  # Hilangkan spasi jika ada
+df = df.dropna()
+
+# Tentukan fitur dan target
 fitur = ['Luas panen', 'Curah hujan', 'Kelembapan', 'Suhu rata-rata']
 target = 'Produksi'
 
-# Split data train (1993–2020) dan test (2021–2025)
+# Cek apakah kolom-kolom penting tersedia
+missing = [col for col in fitur + [target, 'Tahun', 'Provinsi'] if col not in df.columns]
+if missing:
+    st.error(f"❌ Kolom berikut tidak ditemukan dalam dataset: {missing}")
+    st.stop()
+
+# ------------------ SPLIT TRAIN-PREDIKSI ------------------
 df_train = df[df['Tahun'] <= 2020]
-df_test = df[df['Tahun'] > 2020]
+df_pred = df[df['Tahun'] > 2020]
 
-# Model
+X_train = df_train[fitur]
+y_train = df_train[target]
+
+# ------------------ TRAINING MODEL ------------------
 lr = LinearRegression()
-rf = RandomForestRegressor(n_estimators=50, max_depth=4, random_state=42)  # atur agar tidak overfit
+lr.fit(X_train, y_train)
+y_pred_lr = lr.predict(X_train)
 
-# Latih model
-lr.fit(df_train[fitur], df_train[target])
-rf.fit(df_train[fitur], df_train[target])
+rf = RandomForestRegressor(
+    n_estimators=50,
+    max_depth=5,
+    random_state=42
+)
+rf.fit(X_train, y_train)
+y_pred_rf = rf.predict(X_train)
 
-# Prediksi
-df_train['Pred_LR'] = lr.predict(df_train[fitur])
-df_train['Pred_RF'] = rf.predict(df_train[fitur])
-df_test['Pred_LR'] = lr.predict(df_test[fitur])
-df_test['Pred_RF'] = rf.predict(df_test[fitur])
+# ------------------ PREDIKSI MASA DEPAN ------------------
+if not df_pred.empty:
+    X_pred = df_pred[fitur]
+    df_pred = df_pred.copy()  # hindari SettingWithCopyWarning
+    df_pred['Pred_LR'] = lr.predict(X_pred)
+    df_pred['Pred_RF'] = rf.predict(X_pred)
 
-# Evaluasi
-def evaluasi(y_true, y_pred):
-    return {
-        "R² Score": r2_score(y_true, y_pred),
-        "MAE (ton)": mean_absolute_error(y_true, y_pred),
-        "MSE (ton²)": mean_squared_error(y_true, y_pred)
-    }
+# ------------------ EVALUASI ------------------
+st.subheader("📈 Evaluasi Model pada Data Latih")
 
-eval_lr_train = evaluasi(df_train[target], df_train['Pred_LR'])
-eval_rf_train = evaluasi(df_train[target], df_train['Pred_RF'])
-eval_lr_test = evaluasi(df_test[target], df_test['Pred_LR'])
-eval_rf_test = evaluasi(df_test[target], df_test['Pred_RF'])
+def tampilkan_evaluasi(nama, y_true, y_pred):
+    col1, col2, col3 = st.columns(3)
+    col1.metric(f"{nama} - R²", f"{r2_score(y_true, y_pred):.3f}")
+    col2.metric(f"{nama} - MAE", f"{mean_absolute_error(y_true, y_pred):,.0f}")
+    col3.metric(f"{nama} - MSE", f"{mean_squared_error(y_true, y_pred):,.0f}")
 
-# Streamlit UI
-st.title("Prediksi Produksi Padi di Sumatera")
-st.subheader("Evaluasi Model")
+tampilkan_evaluasi("Linear Regression", y_train, y_pred_lr)
+tampilkan_evaluasi("Random Forest", y_train, y_pred_rf)
 
-# Tabel evaluasi
-def tampilkan_evaluasi(judul, eval_lr, eval_rf):
-    st.markdown(f"### {judul}")
-    st.dataframe(pd.DataFrame({
-        "Linear Regression": eval_lr,
-        "Random Forest": eval_rf
-    }))
+# ------------------ VISUALISASI ------------------
+st.subheader("📊 Visualisasi Fitur terhadap Produksi")
+fitur_pilihan = st.selectbox("Pilih fitur:", fitur)
+fig, ax = plt.subplots()
+sns.scatterplot(data=df_train, x=fitur_pilihan, y=target, ax=ax)
+ax.set_title(f'{fitur_pilihan} vs Produksi')
+st.pyplot(fig)
 
-tampilkan_evaluasi("Data Latih (1993–2020)", eval_lr_train, eval_rf_train)
-tampilkan_evaluasi("Data Uji (2021–2025)", eval_lr_test, eval_rf_test)
+# ------------------ HASIL PREDIKSI ------------------
+if not df_pred.empty:
+    st.subheader("📅 Hasil Prediksi Tahun 2021–2025")
+    st.dataframe(df_pred[['Provinsi', 'Tahun', 'Produksi', 'Pred_LR', 'Pred_RF']])
 
-# Visualisasi prediksi vs aktual
-st.subheader("Visualisasi Prediksi vs Aktual")
-tahun_range = st.selectbox("Pilih rentang data", ["1993–2020", "2021–2025"])
-df_plot = df_train if tahun_range == "1993–2020" else df_test
+    st.download_button(
+        label="⬇️ Unduh Hasil Prediksi",
+        data=df_pred.to_csv(index=False),
+        file_name="prediksi_2021_2025.csv",
+        mime="text/csv"
+    )
 
-plt.figure(figsize=(10, 5))
-plt.plot(df_plot['Tahun'], df_plot[target], label='Aktual', marker='o')
-plt.plot(df_plot['Tahun'], df_plot['Pred_LR'], label='Linear Regression', marker='s')
-plt.plot(df_plot['Tahun'], df_plot['Pred_RF'], label='Random Forest', marker='^')
-plt.xlabel("Tahun")
-plt.ylabel("Produksi (ton)")
-plt.title("Prediksi vs Aktual Produksi Padi")
-plt.legend()
-st.pyplot(plt)
-
-# Korelasi fitur (opsional)
-st.subheader("Korelasi dan Distribusi Fitur")
-fitur_dipilih = st.multiselect("Pilih fitur yang ingin dianalisis", fitur, default=fitur[:2])
-
-if fitur_dipilih:
-    st.write("📌 Korelasi antar fitur:")
-    corr = df[fitur_dipilih + [target]].corr()
-    fig_corr, ax = plt.subplots()
-    sns.heatmap(corr, annot=True, cmap='YlGnBu', ax=ax)
-    st.pyplot(fig_corr)
-
-    for f in fitur_dipilih:
-        fig_feat, ax_feat = plt.subplots()
-        sns.scatterplot(data=df, x=f, y=target, ax=ax_feat)
-        ax_feat.set_title(f'Hasil Produksi terhadap {f}')
-        st.pyplot(fig_feat)
-
-st.caption("© 2025 Prediksi Produksi Padi - Streamlit App")
+st.caption("© 2025 — Aplikasi ini dikembangkan menggunakan Streamlit dan Scikit-learn.")
