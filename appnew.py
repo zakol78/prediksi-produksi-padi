@@ -89,7 +89,7 @@ ax.legend()
 st.pyplot(fig)
 
 # Visualisasi Tren Nasional 1993–2030 (Line Chart)
-st.subheader("Grafik Perbandingan Produksi Aktual dengan Hasil Prediksi Model Random Forest dan Linear Regression per Tahun (1993–2030)")
+st.subheader("Grafik Perbandingan Produksi dengan Hasil Prediksi Model Random Forest dan Linear Regression per Tahun (1993–2030)")
 
 df_gabungan = pd.concat([
     df_actual[['Tahun', 'Prediksi (Linear Regression)', 'Prediksi (Random Forest)']],
@@ -102,7 +102,7 @@ fig2, ax2 = plt.subplots(figsize=(10, 5))
 ax2.plot(df_tren['Tahun'], df_tren['Prediksi (Linear Regression)'], marker='o', label='Linear Regression')
 ax2.plot(df_tren['Tahun'], df_tren['Prediksi (Random Forest)'], marker='s', label='Random Forest')
 
-ax2.set_title("Grafik Perbandingan Produksi Aktual dengan Hasil Prediksi Model Random Forest dan Linear Regression per Tahun (1993–2030)")
+ax2.set_title("Grafik Perbandingan Produksi dengan Hasil Prediksi Model Random Forest dan Linear Regression per Tahun (1993–2030)")
 ax2.set_xlabel("Tahun")
 ax2.set_ylabel("Total Produksi (Ton)")
 ax2.legend()
